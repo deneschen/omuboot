@@ -61,6 +61,7 @@ static bool sunxi_mmc_can_calibrate(void)
 	       IS_ENABLED(CONFIG_MACH_SUN50I_H5) ||
 	       IS_ENABLED(CONFIG_SUN50I_GEN_H6) ||
 	       IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2) ||
+	       IS_ENABLED(CONFIG_MACH_SUN60I_A733) ||
 	       IS_ENABLED(CONFIG_MACH_SUN8I_R40);
 }
 
@@ -90,7 +91,10 @@ static int mmc_set_mod_clk(struct sunxi_mmc_priv *priv, unsigned int hz)
 		 * pretend it's always PLL6 without a post divider here.
 		 */
 		pll = CCM_MMC_CTRL_PLL6;
-		pll_hz = clock_get_pll6();
+		if (IS_ENABLED(CONFIG_MACH_SUN60I_A733))
+			pll_hz = 400000000;
+		else
+			pll_hz = clock_get_pll6();
 #endif
 		/*
 		 * On the D1/R528/T113 mux source 1 refers to PLL_PERIPH0(1x),
@@ -219,7 +223,8 @@ static int mmc_config_clock(struct sunxi_mmc_priv *priv, struct mmc *mmc)
 	rval &= ~SUNXI_MMC_CLK_DIVIDER_MASK;
 	writel(rval, &priv->reg->clkcr);
 
-#if defined(CONFIG_SUNXI_GEN_SUN6I) || defined(CONFIG_SUN50I_GEN_H6) || defined(CONFIG_SUNXI_GEN_NCAT2)
+#if defined(CONFIG_SUNXI_GEN_SUN6I) || defined(CONFIG_SUN50I_GEN_H6) || \
+	defined(CONFIG_SUNXI_GEN_NCAT2) || defined(CONFIG_SUNXI_GEN_A733)
 	/* A64 supports calibration of delays on MMC controller and we
 	 * have to set delay of zero before starting calibration.
 	 * Allwinner BSP driver sets a delay only in the case of
@@ -472,7 +477,9 @@ static void sunxi_mmc_reset(void *regs)
 	writel(SUNXI_MMC_GCTRL_RESET, regs + SUNXI_MMC_GCTRL);
 	udelay(1000);
 
-	if (IS_ENABLED(CONFIG_SUN50I_GEN_H6) || IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2)) {
+	if (IS_ENABLED(CONFIG_SUN50I_GEN_H6) ||
+	    IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2) ||
+	    IS_ENABLED(CONFIG_SUNXI_GEN_A733)) {
 		/* Reset card */
 		writel(SUNXI_MMC_HWRST_ASSERT, regs + SUNXI_MMC_HWRST);
 		udelay(10);
@@ -665,12 +672,22 @@ static unsigned get_mclk_offset(void)
 {
 	if (IS_ENABLED(CONFIG_MACH_SUN9I))
 		return 0x410;
+	if (IS_ENABLED(CONFIG_MACH_SUN60I_A733))
+		return 0xd00;
 
 	if (IS_ENABLED(CONFIG_SUN50I_GEN_H6) || IS_ENABLED(CONFIG_SUNXI_GEN_NCAT2))
 		return 0x830;
 
 	return 0x88;
 };
+
+static unsigned int get_mclk_stride(void)
+{
+	if (IS_ENABLED(CONFIG_MACH_SUN60I_A733))
+		return 0x10;
+
+	return 0x4;
+}
 
 static int sunxi_mmc_probe(struct udevice *dev)
 {
@@ -707,7 +724,8 @@ static int sunxi_mmc_probe(struct udevice *dev)
 	ccu_reg = (u32 *)(uintptr_t)ofnode_get_addr(args.node);
 
 	priv->mmc_no = ((uintptr_t)priv->reg - SUNXI_MMC0_BASE) / 0x1000;
-	priv->mclkreg = (void *)ccu_reg + get_mclk_offset() + priv->mmc_no * 4;
+	priv->mclkreg = (void *)ccu_reg + get_mclk_offset() +
+			priv->mmc_no * get_mclk_stride();
 
 	ret = clk_get_by_name(dev, "ahb", &gate_clk);
 	if (!ret)
@@ -752,6 +770,7 @@ static const struct udevice_id sunxi_mmc_ids[] = {
 	{ .compatible = "allwinner,sun50i-h6-emmc" },
 	{ .compatible = "allwinner,sun50i-a100-mmc" },
 	{ .compatible = "allwinner,sun50i-a100-emmc" },
+	{ .compatible = "allwinner,sun60i-a733-mmc" },
 	{ /* sentinel */ }
 };
 

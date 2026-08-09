@@ -19,6 +19,9 @@
 #elif defined(CONFIG_SUN50I_GEN_H6)
 #define SUNXI_PIO_BASE		0x0300b000
 #define SUNXI_R_PIO_BASE	0x07022000
+#elif defined(CONFIG_MACH_SUN60I_A733)
+#define SUNXI_PIO_BASE		0x02000000
+#define SUNXI_R_PIO_BASE	0x07025000
 #elif defined(CONFIG_SUNXI_GEN_NCAT2)
 #define SUNXI_PIO_BASE		0x02000000
 #define SUNXI_R_PIO_BASE	0x07022000
@@ -171,9 +174,13 @@ enum sunxi_gpio_number {
 
 #ifdef CONFIG_SUNXI_NEW_PINCTRL
 	#define SUNXI_PINCTRL_BANK_SIZE	0x30
-	#define SUNXI_GPIO_DISABLE	0xf
 #else
 	#define SUNXI_PINCTRL_BANK_SIZE	0x24
+#endif
+
+#if defined(CONFIG_SUNXI_NEW_PINCTRL) || defined(CONFIG_MACH_SUN60I_A733)
+	#define SUNXI_GPIO_DISABLE	0xf
+#else
 	#define SUNXI_GPIO_DISABLE	0x7
 #endif
 
@@ -182,8 +189,15 @@ enum sunxi_gpio_number {
 #define SUNXI_GPIO_PULL_UP	1
 #define SUNXI_GPIO_PULL_DOWN	2
 
+enum sunxi_gpio_layout {
+	SUNXI_GPIO_LAYOUT_DEFAULT,
+	SUNXI_GPIO_LAYOUT_A733_MAIN,
+	SUNXI_GPIO_LAYOUT_A733_R,
+};
+
 struct sunxi_gpio_plat {
 	void			*regs;
+	enum sunxi_gpio_layout layout;
 	char			bank_name[3];
 };
 
@@ -194,8 +208,12 @@ int sunxi_gpio_get_cfgbank(void *bank_base, int pin_offset);
 int sunxi_gpio_get_cfgpin(u32 pin);
 void sunxi_gpio_set_drv(u32 pin, u32 val);
 void sunxi_gpio_set_drv_bank(void *bank_base, u32 pin_offset, u32 val);
+void sunxi_gpio_set_drv_bank_layout(void *bank_base, u32 pin_offset,
+				    u32 val, enum sunxi_gpio_layout layout);
 void sunxi_gpio_set_pull(u32 pin, u32 val);
 void sunxi_gpio_set_pull_bank(void *bank_base, int pin_offset, u32 val);
+void sunxi_gpio_set_pull_bank_layout(void *bank_base, int pin_offset,
+				     u32 val, enum sunxi_gpio_layout layout);
 int sunxi_name_to_gpio(const char *name);
 
 #if !defined CONFIG_XPL_BUILD && defined CONFIG_AXP_GPIO

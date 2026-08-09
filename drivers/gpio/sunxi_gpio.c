@@ -59,9 +59,37 @@
 #define GPIO_PULL_INDEX(pin)	(((pin) & 0x1f) >> 4)
 #define GPIO_PULL_OFFSET(pin)	((((pin) & 0x1f) & 0xf) << 1)
 
-static void* BANK_TO_GPIO(int bank)
+#define A733_MAIN_BANK_SIZE	0x80
+#define A733_MAIN_DAT_OFFSET	0x10
+#define A733_MAIN_DRV_OFFSET	0x20
+#define A733_MAIN_PULL_OFFSET	0x30
+
+#define A733_R_BANK_SIZE		0x30
+#define A733_R_DAT_OFFSET	0x10
+#define A733_R_DRV_OFFSET	0x14
+#define A733_R_PULL_OFFSET	0x24
+
+static enum sunxi_gpio_layout sunxi_gpio_bank_layout(int bank)
+{
+	if (!IS_ENABLED(CONFIG_MACH_SUN60I_A733))
+		return SUNXI_GPIO_LAYOUT_DEFAULT;
+
+	return bank < SUNXI_GPIO_L ? SUNXI_GPIO_LAYOUT_A733_MAIN :
+		SUNXI_GPIO_LAYOUT_A733_R;
+}
+
+static void *BANK_TO_GPIO(int bank)
 {
 	void *pio_base;
+
+	if (IS_ENABLED(CONFIG_MACH_SUN60I_A733)) {
+		if (bank < SUNXI_GPIO_L)
+			return (void *)(uintptr_t)(SUNXI_PIO_BASE +
+				(bank + 1) * A733_MAIN_BANK_SIZE);
+
+		return (void *)(uintptr_t)(SUNXI_R_PIO_BASE +
+			(bank - SUNXI_GPIO_L) * A733_R_BANK_SIZE);
+	}
 
 	if (bank < SUNXI_GPIO_L) {
 		pio_base = (void *)(uintptr_t)SUNXI_PIO_BASE;
@@ -73,11 +101,54 @@ static void* BANK_TO_GPIO(int bank)
 	return pio_base + bank * SUNXI_PINCTRL_BANK_SIZE;
 }
 
+static u32 sunxi_gpio_data_offset(enum sunxi_gpio_layout layout)
+{
+	if (layout == SUNXI_GPIO_LAYOUT_A733_MAIN)
+		return A733_MAIN_DAT_OFFSET;
+	if (layout == SUNXI_GPIO_LAYOUT_A733_R)
+		return A733_R_DAT_OFFSET;
+
+	return GPIO_DAT_REG_OFFSET;
+}
+
+static u32 sunxi_gpio_drv_reg_offset(enum sunxi_gpio_layout layout,
+				     u32 pin)
+{
+	if (layout == SUNXI_GPIO_LAYOUT_A733_MAIN)
+		return A733_MAIN_DRV_OFFSET + (pin / 8) * 4;
+	if (layout == SUNXI_GPIO_LAYOUT_A733_R)
+		return A733_R_DRV_OFFSET + (pin / 8) * 4;
+
+	return GPIO_DRV_REG_OFFSET + GPIO_DRV_INDEX(pin) * 4;
+}
+
+static u32 sunxi_gpio_drv_bit_offset(enum sunxi_gpio_layout layout, u32 pin)
+{
+	if (layout == SUNXI_GPIO_LAYOUT_A733_MAIN ||
+	    layout == SUNXI_GPIO_LAYOUT_A733_R)
+		return (pin % 8) * 4;
+
+	return GPIO_DRV_OFFSET(pin);
+}
+
+static u32 sunxi_gpio_pull_reg_offset(enum sunxi_gpio_layout layout, u32 pin)
+{
+	u32 offset = GPIO_PULL_REG_OFFSET;
+
+	if (layout == SUNXI_GPIO_LAYOUT_A733_MAIN)
+		offset = A733_MAIN_PULL_OFFSET;
+	else if (layout == SUNXI_GPIO_LAYOUT_A733_R)
+		offset = A733_R_PULL_OFFSET;
+
+	return offset + GPIO_PULL_INDEX(pin) * 4;
+}
+
 void sunxi_gpio_set_cfgbank(void *bank_base, int pin_offset, u32 val)
 {
 	u32 index = GPIO_CFG_INDEX(pin_offset);
 	u32 offset = GPIO_CFG_OFFSET(pin_offset);
 
+	/* bank_base always points at the first configuration register. */
 	clrsetbits_le32(bank_base + GPIO_CFG_REG_OFFSET + index * 4,
 			0xfU << offset, val << offset);
 }
@@ -110,51 +181,69 @@ int sunxi_gpio_get_cfgpin(u32 pin)
 	return sunxi_gpio_get_cfgbank(bank_base, GPIO_NUM(pin));
 }
 
-static void sunxi_gpio_set_value_bank(void *bank_base, int pin, bool set)
+static void sunxi_gpio_set_value_bank(void *bank_base, int pin, bool set,
+				      enum sunxi_gpio_layout layout)
 {
 	u32 mask = 1U << pin;
 
-	clrsetbits_le32(bank_base + GPIO_DAT_REG_OFFSET,
+	clrsetbits_le32(bank_base + sunxi_gpio_data_offset(layout),
 			set ? 0 : mask, set ? mask : 0);
 }
 
-static int sunxi_gpio_get_value_bank(void *bank_base, int pin)
+static int sunxi_gpio_get_value_bank(void *bank_base, int pin,
+				     enum sunxi_gpio_layout layout)
 {
-	return !!(readl(bank_base + GPIO_DAT_REG_OFFSET) & (1U << pin));
+	return !!(readl(bank_base + sunxi_gpio_data_offset(layout)) & (1U << pin));
 }
 
 void sunxi_gpio_set_drv(u32 pin, u32 val)
 {
 	u32 bank = GPIO_BANK(pin);
 	void *bank_base = BANK_TO_GPIO(bank);
+	enum sunxi_gpio_layout layout = sunxi_gpio_bank_layout(bank);
 
-	sunxi_gpio_set_drv_bank(bank_base, GPIO_NUM(pin), val);
+	sunxi_gpio_set_drv_bank_layout(bank_base, GPIO_NUM(pin), val, layout);
+}
+
+void sunxi_gpio_set_drv_bank_layout(void *bank_base, u32 pin_offset,
+				    u32 val, enum sunxi_gpio_layout layout)
+{
+	u32 reg_offset = sunxi_gpio_drv_reg_offset(layout, pin_offset);
+	u32 bit_offset = sunxi_gpio_drv_bit_offset(layout, pin_offset);
+
+	clrsetbits_le32(bank_base + reg_offset, 0x3U << bit_offset,
+			val << bit_offset);
 }
 
 void sunxi_gpio_set_drv_bank(void *bank_base, u32 pin_offset, u32 val)
 {
-	u32 index = GPIO_DRV_INDEX(pin_offset);
-	u32 offset = GPIO_DRV_OFFSET(pin_offset);
-
-	clrsetbits_le32(bank_base + GPIO_DRV_REG_OFFSET + index * 4,
-			0x3U << offset, val << offset);
+	sunxi_gpio_set_drv_bank_layout(bank_base, pin_offset, val,
+				       SUNXI_GPIO_LAYOUT_DEFAULT);
 }
 
 void sunxi_gpio_set_pull(u32 pin, u32 val)
 {
 	u32 bank = GPIO_BANK(pin);
 	void *bank_base = BANK_TO_GPIO(bank);
+	enum sunxi_gpio_layout layout = sunxi_gpio_bank_layout(bank);
 
-	sunxi_gpio_set_pull_bank(bank_base, GPIO_NUM(pin), val);
+	sunxi_gpio_set_pull_bank_layout(bank_base, GPIO_NUM(pin), val, layout);
+}
+
+void sunxi_gpio_set_pull_bank_layout(void *bank_base, int pin_offset,
+				     u32 val, enum sunxi_gpio_layout layout)
+{
+	u32 offset = GPIO_PULL_OFFSET(pin_offset);
+	u32 reg_offset = sunxi_gpio_pull_reg_offset(layout, pin_offset);
+
+	clrsetbits_le32(bank_base + reg_offset,
+			0x3U << offset, val << offset);
 }
 
 void sunxi_gpio_set_pull_bank(void *bank_base, int pin_offset, u32 val)
 {
-	u32 index = GPIO_PULL_INDEX(pin_offset);
-	u32 offset = GPIO_PULL_OFFSET(pin_offset);
-
-	clrsetbits_le32(bank_base + GPIO_PULL_REG_OFFSET + index * 4,
-			0x3U << offset, val << offset);
+	sunxi_gpio_set_pull_bank_layout(bank_base, pin_offset, val,
+					SUNXI_GPIO_LAYOUT_DEFAULT);
 }
 
 /* =========== Non-DM code, used by the SPL. ============ */
@@ -165,7 +254,8 @@ static void sunxi_gpio_set_value(u32 pin, bool set)
 	u32 bank = GPIO_BANK(pin);
 	void *pio = BANK_TO_GPIO(bank);
 
-	sunxi_gpio_set_value_bank(pio, GPIO_NUM(pin), set);
+	sunxi_gpio_set_value_bank(pio, GPIO_NUM(pin), set,
+				  sunxi_gpio_bank_layout(bank));
 }
 
 static int sunxi_gpio_get_value(u32 pin)
@@ -173,7 +263,8 @@ static int sunxi_gpio_get_value(u32 pin)
 	u32 bank = GPIO_BANK(pin);
 	void *pio = BANK_TO_GPIO(bank);
 
-	return sunxi_gpio_get_value_bank(pio, GPIO_NUM(pin));
+	return sunxi_gpio_get_value_bank(pio, GPIO_NUM(pin),
+					 sunxi_gpio_bank_layout(bank));
 }
 
 int gpio_request(unsigned gpio, const char *label)
@@ -253,7 +344,7 @@ static int sunxi_gpio_get_value(struct udevice *dev, unsigned offset)
 {
 	struct sunxi_gpio_plat *plat = dev_get_plat(dev);
 
-	return sunxi_gpio_get_value_bank(plat->regs, offset);
+	return sunxi_gpio_get_value_bank(plat->regs, offset, plat->layout);
 }
 
 static int sunxi_gpio_get_function(struct udevice *dev, unsigned offset)
@@ -292,7 +383,7 @@ static int sunxi_gpio_set_flags(struct udevice *dev, unsigned int offset,
 	if (flags & GPIOD_IS_OUT) {
 		u32 value = !!(flags & GPIOD_IS_OUT_ACTIVE);
 
-		sunxi_gpio_set_value_bank(plat->regs, offset, value);
+		sunxi_gpio_set_value_bank(plat->regs, offset, value, plat->layout);
 		sunxi_gpio_set_cfgbank(plat->regs, offset, SUNXI_GPIO_OUTPUT);
 	} else if (flags & GPIOD_IS_IN) {
 		u32 pull = 0;
@@ -301,7 +392,8 @@ static int sunxi_gpio_set_flags(struct udevice *dev, unsigned int offset,
 			pull = 1;
 		else if (flags & GPIOD_PULL_DOWN)
 			pull = 2;
-		sunxi_gpio_set_pull_bank(plat->regs, offset, pull);
+		sunxi_gpio_set_pull_bank_layout(plat->regs, offset, pull,
+						plat->layout);
 		sunxi_gpio_set_cfgbank(plat->regs, offset, SUNXI_GPIO_INPUT);
 	}
 

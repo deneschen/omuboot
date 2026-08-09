@@ -27,6 +27,14 @@
 #endif
 
 &binman {
+#ifdef CONFIG_MACH_SUN60I_A733
+	u-boot-a733-bl33 {
+		filename = "u-boot-a733-bl33.bin";
+
+		u-boot {
+		};
+	};
+#else
 	u-boot-sunxi-with-spl {
 		filename = "u-boot-sunxi-with-spl.bin";
 		pad-byte = <0xff>;
@@ -126,4 +134,5 @@
 		};
 #endif
 	};
+#endif
 };

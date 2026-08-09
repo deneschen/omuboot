@@ -45,6 +45,7 @@ dtb-$(CONFIG_MACH_S900) += \
 	bubblegum_96.dtb
 dtb-$(CONFIG_MACH_S700) += \
 	s700-cubieboard7.dtb
+dtb-$(CONFIG_MACH_SUN60I_A733) += sun60i-a733-cubie-a7s.dtb
 
 dtb-$(CONFIG_ROCKCHIP_RK3368) += \
 	rk3368-sheep.dtb \

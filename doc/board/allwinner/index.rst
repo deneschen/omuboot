@@ -6,4 +6,5 @@ Allwinner (sunxi) boards
 .. toctree::
    :maxdepth: 2
 
+   cubie-a7s
    sunxi

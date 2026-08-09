@@ -25,17 +25,26 @@ enum ccu_flags {
  * struct ccu_clk_gate - ccu clock gate
  * @off:	gate offset
  * @bit:	gate bit
+ * @key_value:	write-protection key, or 0 if none
  * @flags:	ccu clock gate flags
  */
 struct ccu_clk_gate {
 	u16 off;
 	u32 bit;
+	u32 key_value;
 	enum ccu_flags flags;
 };
 
 #define GATE(_off, _bit) {			\
 	.off = _off,				\
 	.bit = _bit,				\
+	.flags = CCU_CLK_F_IS_VALID,		\
+}
+
+#define GATE_KEY(_off, _bit, _key_value) {	\
+	.off = _off,				\
+	.bit = _bit,				\
+	.key_value = _key_value,		\
 	.flags = CCU_CLK_F_IS_VALID,		\
 }
 
@@ -70,8 +79,8 @@ struct ccu_reset {
 struct ccu_desc {
 	const struct ccu_clk_gate *gates;
 	const struct ccu_reset *resets;
-	u8 num_gates;
-	u8 num_resets;
+	u16 num_gates;
+	u16 num_resets;
 };
 
 /**

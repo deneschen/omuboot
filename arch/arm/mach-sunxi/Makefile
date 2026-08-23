@@ -9,6 +9,7 @@
 obj-y	+= board.o
 obj-y	+= cpu_info.o
 obj-y	+= dram_helpers.o
+obj-$(CONFIG_MACH_SUN60I_A733)	+= sunxi_smc_a733.o
 obj-$(CONFIG_SUN6I_PRCM)	+= prcm.o
 obj-$(CONFIG_SUNXI_SYSCON)	+= syscon.o
 obj-$(CONFIG_AXP_PMIC_BUS)	+= pmic_bus.o

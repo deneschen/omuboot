@@ -576,6 +576,7 @@ config MACH_SUN55I_A523
 config MACH_SUN60I_A733
 	bool "sun60i (Allwinner A733)"
 	select CPU_V7A
+	select ARM_SMCCC
 	select SKIP_LOWLEVEL_INIT_ONLY
 	select SUNXI_GEN_A733
 	select SYS_ARCH_TIMER
@@ -583,6 +584,8 @@ config MACH_SUN60I_A733
 	  Build U-Boot as the AArch32 BL33 payload for an A733 boot chain.
 	  boot0 initializes DRAM and loads the FIP; TF-A and the AR100S image
 	  provide EL3 and SCP services before entering U-Boot at 0x4a000000.
+	  Linux is AArch64: booti prepares the Image, then BL31 RUNNSOS
+	  switches the execution state.
 
 endchoice
 

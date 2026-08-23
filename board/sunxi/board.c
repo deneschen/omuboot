@@ -53,6 +53,49 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+#ifdef CONFIG_MACH_SUN60I_A733
+/*
+ * boot0 patches the monitor header before entering BL31. Keep U-Boot's
+ * own 32-bit address space capped, but retain the detected physical DRAM
+ * size so the final Linux DT can describe memory above 4 GiB.
+ */
+#define SUNXI_A733_MONITOR_HEAD_BASE	0x48000000UL
+#define SUNXI_A733_DRAM_MIN_MIB		128U
+#define SUNXI_A733_DRAM_MAX_MIB		32768U
+
+struct sunxi_a733_monitor_head {
+	u32 jump_instruction;
+	u8 magic[8];
+	u32 scp_base;
+	u32 nboot_base;
+	u32 nos_base;
+	u32 secureos_base;
+	u8 version[8];
+	u8 platform[8];
+	u32 load_address;
+	u32 dram_size_mib;
+};
+
+static u32 sunxi_a733_physical_dram_mib;
+
+static u32 sunxi_a733_get_physical_dram_mib(void)
+{
+	const struct sunxi_a733_monitor_head *head =
+		(const void *)SUNXI_A733_MONITOR_HEAD_BASE;
+	u32 size_mib;
+
+	if (memcmp(head->magic, "monitor", sizeof("monitor") - 1))
+		return 0;
+
+	size_mib = head->dram_size_mib;
+	if (size_mib < SUNXI_A733_DRAM_MIN_MIB ||
+	    size_mib > SUNXI_A733_DRAM_MAX_MIB)
+		return 0;
+
+	return size_mib;
+}
+#endif
+
 void i2c_init_board(void)
 {
 #ifdef CONFIG_I2C0_ENABLE
@@ -273,6 +316,10 @@ int dram_init(void)
 {
 	struct boot_file_head *spl = get_spl_header(SPL_DRAM_HEADER_VERSION);
 
+#ifdef CONFIG_MACH_SUN60I_A733
+	sunxi_a733_physical_dram_mib = sunxi_a733_get_physical_dram_mib();
+#endif
+
 	if (spl == INVALID_SPL_HEADER)
 		gd->ram_size = get_ram_size((long *)PHYS_SDRAM_0,
 					    PHYS_SDRAM_0_SIZE);
@@ -284,6 +331,17 @@ int dram_init(void)
 
 	return 0;
 }
+
+#ifdef CONFIG_MACH_SUN60I_A733
+void board_add_ram_info(int use_default)
+{
+	(void)use_default;
+
+	if (sunxi_a733_physical_dram_mib)
+		printf(" (%u MiB physical for Linux)",
+		       sunxi_a733_physical_dram_mib);
+}
+#endif
 
 #if defined(CONFIG_NAND_SUNXI) && defined(CONFIG_XPL_BUILD)
 static void nand_pinmux_setup(void)
@@ -942,6 +1000,15 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 
 	bluetooth_dt_fixup(blob);
 	board_dt_fixup(blob);
+
+#ifdef CONFIG_MACH_SUN60I_A733
+	if (sunxi_a733_physical_dram_mib) {
+		r = fdt_fixup_memory(blob, (u64)PHYS_SDRAM_0,
+				     (u64)sunxi_a733_physical_dram_mib << 20);
+		if (r)
+			return r;
+	}
+#endif
 
 #ifdef CONFIG_VIDEO_DT_SIMPLEFB
 	r = sunxi_simplefb_setup(blob);

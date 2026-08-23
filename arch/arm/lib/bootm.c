@@ -37,6 +37,10 @@
 #include <asm/armv7.h>
 #endif
 #include <asm/setup.h>
+#ifdef CONFIG_MACH_SUN60I_A733
+unsigned long sunxi_smc_call4(unsigned long a0, unsigned long a1,
+			      unsigned long a2, unsigned long a3);
+#endif
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -351,6 +355,26 @@ static void boot_jump_linux(struct bootm_headers *images, int flag)
 #ifdef CONFIG_ARMV7_NONSEC
 	if (armv7_boot_nonsec()) {
 		secure_ram_addr(_do_nonsec_entry)(kernel_entry, 0, machid, r2);
+	} else
+#endif
+#ifdef CONFIG_MACH_SUN60I_A733
+	if (images->os.arch == IH_ARCH_ARM64) {
+		unsigned long ret, cpsr, service_count;
+
+		asm volatile("mrs %0, cpsr" : "=r"(cpsr));
+		service_count = sunxi_smc_call4(0x8000ff00UL, 0, 0, 0);
+		printf("[DEBUG-A733-SMC] call_count=0x%08lx cpsr=0x%08lx\n",
+		       service_count, cpsr);
+
+		/*
+		 * A733 BL33 is AArch32. Ask BL31 to enter the ARM64 Image
+		 * (vendor ARM_SVC_RUNNSOS): r1=entry, r2=dtb, r3=1 (AArch64).
+		 */
+		printf("Starting AArch64 Linux via BL31 RUNNSOS-v5, entry 0x%08lx dtb 0x%08lx cpsr=0x%08lx\n",
+		       (ulong)kernel_entry, r2, cpsr);
+		ret = sunxi_smc_call4(0x8000ff04UL, (unsigned long)kernel_entry,
+				      r2, 1);
+		printf("BL31 RUNNSOS returned 0x%lx\n", ret);
 	} else
 #endif
 	{

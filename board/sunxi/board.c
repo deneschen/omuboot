@@ -76,8 +76,6 @@ struct sunxi_a733_monitor_head {
 	u32 dram_size_mib;
 };
 
-static u32 sunxi_a733_physical_dram_mib;
-
 static u32 sunxi_a733_get_physical_dram_mib(void)
 {
 	const struct sunxi_a733_monitor_head *head =
@@ -316,10 +314,6 @@ int dram_init(void)
 {
 	struct boot_file_head *spl = get_spl_header(SPL_DRAM_HEADER_VERSION);
 
-#ifdef CONFIG_MACH_SUN60I_A733
-	sunxi_a733_physical_dram_mib = sunxi_a733_get_physical_dram_mib();
-#endif
-
 	if (spl == INVALID_SPL_HEADER)
 		gd->ram_size = get_ram_size((long *)PHYS_SDRAM_0,
 					    PHYS_SDRAM_0_SIZE);
@@ -335,11 +329,12 @@ int dram_init(void)
 #ifdef CONFIG_MACH_SUN60I_A733
 void board_add_ram_info(int use_default)
 {
+	u32 size_mib = sunxi_a733_get_physical_dram_mib();
+
 	(void)use_default;
 
-	if (sunxi_a733_physical_dram_mib)
-		printf(" (%u MiB physical for Linux)",
-		       sunxi_a733_physical_dram_mib);
+	if (size_mib)
+		printf(" (%u MiB physical for Linux)", size_mib);
 }
 #endif
 
@@ -989,6 +984,9 @@ static void board_dt_fixup(void *blob)
 int ft_board_setup(void *blob, struct bd_info *bd)
 {
 	int __maybe_unused r;
+#ifdef CONFIG_MACH_SUN60I_A733
+	u32 size_mib = sunxi_a733_get_physical_dram_mib();
+#endif
 
 	/*
 	 * Call setup_environment and fdt_fixup_ethernet again
@@ -1002,9 +1000,9 @@ int ft_board_setup(void *blob, struct bd_info *bd)
 	board_dt_fixup(blob);
 
 #ifdef CONFIG_MACH_SUN60I_A733
-	if (sunxi_a733_physical_dram_mib) {
+	if (size_mib) {
 		r = fdt_fixup_memory(blob, (u64)PHYS_SDRAM_0,
-				     (u64)sunxi_a733_physical_dram_mib << 20);
+				     (u64)size_mib << 20);
 		if (r)
 			return r;
 	}

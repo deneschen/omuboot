@@ -395,13 +395,17 @@ config CMD_BOOTZ
 
 config CMD_BOOTI
 	bool "booti"
-	depends on ARM64 || RISCV || SANDBOX
+	depends on ARM64 || RISCV || SANDBOX || MACH_SUN60I_A733
 	depends on LMB
 	default y
 	select LIB_BOOTI
 	select LIB_BOOTM
 	help
 	  Boot an AArch64 Linux Kernel image from memory.
+
+	  Also available on the AArch32 A733 BL33 port: extlinux loads a
+	  raw ARM64 Image, and boot_jump_linux asks BL31 (RUNNSOS) to
+	  enter it in AArch64.
 
 config BOOTM_LINUX
 	bool "Support booting Linux OS images"

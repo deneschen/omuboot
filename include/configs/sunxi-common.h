@@ -68,7 +68,7 @@
  * We cannot use expressions here, because expressions won't be evaluated in
  * autoconf.mk.
  */
-#ifdef CONFIG_ARM64
+#if defined(CONFIG_ARM64) || defined(CONFIG_MACH_SUN60I_A733)
 /*
  * Boards seem to come with at least 512MB of DRAM.
  * The kernel should go at 512K, which is the default text offset (that will
@@ -76,6 +76,11 @@
  * There is no compression for arm64 kernels (yet), so leave some space
  * for really big kernels, say 256MB for now.
  * Scripts, PXE and DTBs should go afterwards, leaving the rest for the initrd.
+ *
+ * A733 BL33 is AArch32, but it boots an uncompressed ARM64 Image. The
+ * 32-bit sunxi map only leaves 16MB between kernel_addr_r (0x42000000)
+ * and fdt_addr_r (0x43000000); a 5.15 KASAN Image (~23MB) overlaps the
+ * DTB. Use the ARM64 map so FDT sits at 0x4fa00000.
  */
 #define BOOTM_SIZE        __stringify(0xa000000)
 #define KERNEL_ADDR_R     __stringify(SDRAM_OFFSET(0080000))

@@ -359,12 +359,9 @@ static void boot_jump_linux(struct bootm_headers *images, int flag)
 #endif
 #ifdef CONFIG_MACH_SUN60I_A733
 	if (images->os.arch == IH_ARCH_ARM64) {
-		unsigned long ret, cpsr, service_count;
+		unsigned long ret, cpsr;
 
 		asm volatile("mrs %0, cpsr" : "=r"(cpsr));
-		service_count = sunxi_smc_call4(0x8000ff00UL, 0, 0, 0);
-		printf("[DEBUG-A733-SMC] call_count=0x%08lx cpsr=0x%08lx\n",
-		       service_count, cpsr);
 
 		/*
 		 * A733 BL33 is AArch32. Ask BL31 to enter the ARM64 Image

@@ -237,6 +237,20 @@ int board_init(void)
 
 	gd->bd->bi_boot_params = (PHYS_SDRAM_0 + 0x100);
 
+#ifdef CONFIG_MACH_SUN60I_A733
+	/*
+	 * Vendor board_sun60iw2.c assigns shared SRAM to the NPU here.
+	 * Do this in U-Boot proper: boot0 still uses shared SRAM for its stack.
+	 */
+	{
+		void __iomem *sram_ctrl = (void __iomem *)0x03000008;
+
+		writel(readl(sram_ctrl) & ~BIT(1), sram_ctrl);
+		if (readl(sram_ctrl) & BIT(1))
+			printf("A7S NPU SRAM: selection write failed\n");
+	}
+#endif
+
 #if !defined(CONFIG_ARM64) && !defined(CONFIG_MACH_SUNIV)
 	asm volatile("mrc p15, 0, %0, c0, c1, 1" : "=r"(id_pfr1));
 	debug("id_pfr1: 0x%08x\n", id_pfr1);

@@ -182,6 +182,14 @@
 	"mmc_auto "
 
 #define BOOT_TARGET_DEVICES_MMC(func) func(MMC_AUTO, mmc_auto, na)
+#elif defined(CONFIG_MACH_SUN60I_A733)
+/*
+ * The A733 boot chain can live on either the SD card (SMHC0 / dev 0) or
+ * the on-board eMMC (SMHC2 / dev 1).  Scan both, in BROM order: the BROM
+ * tries mmc0 first and falls back to mmc2 when no bootable SD card is
+ * present, so the same device that loaded the FIP boots the system.
+ */
+#define BOOT_TARGET_DEVICES_MMC(func) func(MMC, mmc, 0) func(MMC, mmc, 1)
 #else
 #define BOOT_TARGET_DEVICES_MMC(func) func(MMC, mmc, 0)
 #endif

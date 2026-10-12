@@ -13,6 +13,7 @@
 
 	aliases {
 		mmc0 = &mmc0;
+		mmc1 = &mmc1;
 		serial0 = &uart0;
 	};
 
@@ -68,6 +69,28 @@
 				drive-strength = <30>;
 				bias-pull-up;
 			};
+
+			mmc1_pins: mmc1-pins {
+				pins = "PC6", "PC8", "PC9", "PC10", "PC11",
+				       "PC13", "PC14", "PC15", "PC16";
+				function = "mmc2";
+				drive-strength = <20>;
+				bias-pull-up;
+			};
+
+			mmc1_clk_pin: mmc1-clk-pin {
+				pins = "PC5", "PC1";
+				function = "mmc2";
+				drive-strength = <30>;
+				bias-pull-up;
+			};
+
+			mmc1_ds_pin: mmc1-ds-pin {
+				pins = "PC0";
+				function = "mmc2";
+				drive-strength = <30>;
+				bias-pull-down;
+			};
 		};
 
 		ccu: clock-controller@2002000 {
@@ -100,6 +123,21 @@
 			pinctrl-names = "default";
 			pinctrl-0 = <&mmc0_pins &mmc0_clk_pin>;
 			broken-cd;
+			status = "okay";
+		};
+
+		mmc1: mmc@4022000 {
+			compatible = "allwinner,sun60i-a733-mmc";
+			reg = <0x04022000 0x1000>;
+			clocks = <&ccu CLK_BUS_SMHC2>, <&ccu CLK_SMHC2>;
+			clock-names = "ahb", "mmc";
+			resets = <&ccu RST_BUS_SMHC2>;
+			reset-names = "ahb";
+			bus-width = <8>;
+			max-frequency = <50000000>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&mmc1_pins &mmc1_clk_pin &mmc1_ds_pin>;
+			non-removable;
 			status = "okay";
 		};
 

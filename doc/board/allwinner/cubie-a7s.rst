@@ -57,13 +57,14 @@ BL33 entry and relocation Built            Entry is ``0x4a000000``
 ARM generic timer         Built            24 MHz counter inherited from TF-A
 UART0 console             Built            PB9/PB10 settings match boot0
 SD card on SMHC0          Built            A733 clock/reset layout is supported
+eMMC on SMHC2             Built            boot0 head carries the SDC2 pin table
 FAT/ext4/GPT              Built            Standard U-Boot commands
 bootstd/extlinux/EFI/FIT  Built            Standard U-Boot boot framework
 System reset              Built            PSCI service provided by BL31
 DRAM/PMIC                 External         Owned by boot0
 GIC-600/EL3               External         Owned by BL31
 AR100S services           External         Owned by ``boot0-A7S/ar100s``
-eMMC/UFS                  Not enabled      Board wiring and tuning are pending
+UFS                       Not enabled      Board wiring and tuning are pending
 USB/network recovery      Not enabled      A733 PHY/MAC integration is pending
 HDMI 2.0                  Not ported       Present in the vendor DRM stack
 MIPI DSI/LVDS/panels      Not ported       Present in the vendor DRM stack
@@ -71,6 +72,11 @@ MIPI CSI/camera/ISP       Not implemented  No A733 camera driver in vendor U-Boo
 GPU                       Not implemented  Runtime driver belongs in the OS
 NPU                       Handoff only     Vendor code only has clock/SRAM hooks
 ========================  ===============  ===================================
+
+The boot target list scans ``mmc0`` (SD card) before ``mmc1`` (eMMC), which
+matches the BROM boot order: it tries MMC0 first and falls back to MMC2 when
+no bootable SD card is present, so the medium that loaded the FIP is the one
+that is scanned first at the U-Boot stage.
 
 The vendor ``u-boot-aw2501`` display implementation is based on U-Boot
 2018.07 and contains about 115,000 lines under its private DRM subtree. It

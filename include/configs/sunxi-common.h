@@ -299,6 +299,22 @@
 #define FDTFILE CONFIG_DEFAULT_DEVICE_TREE ".dtb"
 #endif
 
+/*
+ * The generic bootcmd_mmcN sets "devnum" with a hush-local assignment
+ * ("devnum=N; run mmc_boot"), which is invisible to the C-side ${devnum}
+ * expansion that pxe_utils applies to the extlinux append line (it only
+ * looks at the environment).  The A733 boots its root filesystem from the
+ * medium that booted, via root=/dev/mmcblk${devnum}p1, so export the value
+ * with setenv.  Later entries override the BOOTENV copies above.
+ */
+#ifdef CONFIG_MACH_SUN60I_A733
+#define BOOTCMD_A733_MMC_DEV \
+	"bootcmd_mmc0=setenv devnum 0; run mmc_boot\0" \
+	"bootcmd_mmc1=setenv devnum 1; run mmc_boot\0"
+#else
+#define BOOTCMD_A733_MMC_DEV
+#endif
+
 #define CFG_EXTRA_ENV_SETTINGS \
 	CONSOLE_ENV_SETTINGS \
 	MEM_LAYOUT_ENV_SETTINGS \
@@ -310,6 +326,7 @@
 	"uuid_gpt_system=" UUID_GPT_SYSTEM "\0" \
 	"partitions=" PARTS_DEFAULT "\0" \
 	BOOTCMD_SUNXI_COMPAT \
-	BOOTENV
+	BOOTENV \
+	BOOTCMD_A733_MMC_DEV
 
 #endif /* _SUNXI_COMMON_CONFIG_H */
